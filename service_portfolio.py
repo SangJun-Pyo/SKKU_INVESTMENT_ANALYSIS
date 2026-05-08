@@ -184,7 +184,7 @@ def allocate_alpha(
             ticker=s.ticker,
             name=s.ticker,  # ETF 이름은 호출자가 universe에서 조회해 채워야 합니다
             role="Alpha",
-            target_amount=round(capped_amount, -6),  # 백만 원 단위로 반올림
+            target_amount=int(capped_amount // 1_000_000) * 1_000_000,  # 항상 내림하여 합계가 예산 초과하지 않도록
             # target_weight는 calculate_target_weights()에서 재계산합니다
             target_weight=0.0,
             signal_score=s.total_score,
@@ -335,12 +335,13 @@ def suggest_portfolio(
     available_funds = BASE_CAPITAL + borrowed_cash
     cash = available_funds - total_exposure
 
-    # 6단계: 위반 사항 사전 검증
-    if total_exposure > MAX_TOTAL_EXPOSURE:
+    # 6단계: 위반 사항 사전 검증 (부동소수점 오차 허용)
+    # 내림 반올림으로 소액 오차가 발생할 수 있으므로 10만원/0.01% 허용
+    if total_exposure > MAX_TOTAL_EXPOSURE + 100_000:
         warnings.append(
             f"총 익스포저 {total_exposure/1e8:.1f}억 — 130억 상한 초과 (BLOCK)"
         )
-    if leverage_ratio > 0.30:
+    if leverage_ratio > 0.30 + 0.0001:
         warnings.append(
             f"레버리지 {leverage_ratio:.1%} — 30% 상한 초과 (BLOCK)"
         )

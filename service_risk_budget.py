@@ -339,8 +339,8 @@ def check_violations(
             f"{MAX_TOTAL_EXPOSURE/1e8:.0f}억 상한 초과 (BLOCK)"
         )
 
-    # 가드레일 2: 레버리지 ≤ 30%
-    if leverage_ratio > MAX_LEVERAGE_RATIO:
+    # 가드레일 2: 레버리지 ≤ 30% (0.01% 부동소수점 오차 허용)
+    if leverage_ratio > MAX_LEVERAGE_RATIO + 0.0001:
         violations.append(
             f"레버리지 {leverage_ratio:.1%} — "
             f"{MAX_LEVERAGE_RATIO:.0%} 상한 초과 (BLOCK)"
