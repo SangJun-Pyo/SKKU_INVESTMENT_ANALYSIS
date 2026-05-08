@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MarkovPortfolio V4</title>
+  <!--
+    캐시 버스팅 파라미터를 붙이는 이유:
+    개발 중 CSS·JS 변경 시 브라우저 캐시가 남아 구버전이 보이는 문제를 방지하기 위함.
+    배포마다 버전을 올려주면 됩니다.
+  -->
+  <link rel="stylesheet" href="/static/style.css?v=20260504" />
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════════════
+  앱 헤더
+  로고 + Week 선택기 + 탭 네비게이션 + 금요일 종가 실행 배지
+  sticky로 고정하는 이유: 긴 테이블 스크롤 중에도 탭 전환이 가능해야 하기 때문
+══════════════════════════════════════════════════════════════ -->
+<header class="app-header">
+  <!-- 로고 -->
+  <div class="logo">MarkovPortfolio <span class="version">V4</span></div>
+
+  <!-- Week 선택기: 6주 과제 기준으로 고정 -->
+  <div class="week-selector">
+    <label for="week-select">Week</label>
+    <select id="week-select">
+      <option value="1">Week 1</option>
+      <option value="2">Week 2</option>
+      <option value="3">Week 3</option>
+      <option value="4">Week 4</option>
+      <option value="5">Week 5</option>
+      <option value="6">Week 6</option>
+    </select>
+  </div>
+
+  <!-- 탭 네비게이션 -->
+  <nav class="tab-nav">
+    <button class="tab-btn active" data-tab="portfolio">포트폴리오</button>
+    <button class="tab-btn" data-tab="allocation">배분 &amp; 리스크</button>
+    <button class="tab-btn" data-tab="orders">주문 &amp; 리포트</button>
+    <button class="tab-btn" data-tab="pnl">P&amp;L 추적</button>
+    <button class="tab-btn" data-tab="committee">AI 투자위원회</button>
+  </nav>
+
+  <!-- 체결 기준 배지: 금요일 종가 규칙을 헤더에서 항상 상기시키기 위함 -->
+  <div class="execution-badge">금요일 종가 실행</div>
+</header>
+
+<!-- ══════════════════════════════════════════════════════════════
+  메인 컨텐츠 영역
+  header가 sticky이므로 padding-top으로 헤더 높이만큼 보정
+══════════════════════════════════════════════════════════════ -->
+<main class="app-main">
+
+  <!-- ══════════════════════════════════════════
+    탭 1: 포트폴리오 (ETF 유니버스 + 주간 신호 점수)
+    2컬럼 레이아웃: 왼쪽에서 ETF를 관리하고 오른쪽에서 점수를 확인
+  ══════════════════════════════════════════ -->
+  <section id="tab-portfolio" class="tab-content active">
+    <div class="two-column">
+
+      <!-- ETF 유니버스 카드 -->
+      <div class="card" id="etf-universe-card">
+        <div class="card-header">
+          <h2>ETF 유니버스</h2>
+          <!-- count-badge: ETF 개수 한도(9개)를 실시간으로 표시 -->
+          <span id="etf-count-badge" class="count-badge">0/9</span>
+        </div>
+
+        <!-- ETF 추가 폼 -->
+        <div class="etf-add-form">
+          <input
+            type="text"
+            id="etf-ticker-input"
+            placeholder="티커 (예: 069500.KS)"
+          />
+          <input
+            type="text"
+            id="etf-name-input"
+            placeholder="ETF 이름"
+          />
+          <!-- role: Core/Alpha/Hedge/Tactical/Short 배분 로직에 영향 -->
+          <select id="etf-role-select">
+            <option value="Core">Core</option>
+            <option value="Alpha">Alpha</option>
+            <option value="Hedge">Hedge</option>
+            <option value="Tactical">Tactical</option>
+            <option value="Short">Short</option>
+          </select>
+          <!-- currency_exposure: 환 헷지 여부 추적 -->
+          <select id="etf-currency-select">
+            <option value="KRW">KRW</option>
+            <option value="Hedged">Hedged</option>
+            <option value="Unhedged">Unhedged</option>
+            <option value="USD">USD</option>
+          </select>
+          <button id="etf-add-btn" class="btn-primary">추가</button>
+        </div>
+
+        <!-- ETF 목록 (etfUniverse.js가 렌더링) -->
+        <div id="etf-list" class="etf-list"></div>
+      </div><!-- /etf-universe-card -->
+
+      <!-- 주간 신호 점수 카드 -->
+      <div class="card" id="weekly-score-card">
+        <div class="card-header">
+          <h2>주간 신호 점수</h2>
+          <button id="run-score-btn" class="btn-primary">점수 계산</button>
+        </div>
+
+        <!-- 로딩 표시: 점수 계산 API 호출 중에만 표시 -->
+        <div id="score-loading" class="loading hidden">계산 중...</div>
+
+        <div id="score-table-container">
+          <!--
+            점수 테이블: 6가지 지표로 100점 만점 채점
+            만점 배분 — 추세:25pt, 풀백:20pt, 변동성:20pt, 모멘텀:15pt, 낙폭:10pt, 상관:10pt
+          -->
+          <table class="score-table" id="score-table">
+            <thead>
+              <tr>
+                <th>ETF</th>
+                <th>현재가</th>
+                <th>추세<br /><small>25pt</small></th>
+                <th>풀백<br /><small>20pt</small></th>
+                <th>변동성<br /><small>20pt</small></th>
+                <th>모멘텀<br /><small>15pt</small></th>
+                <th>낙폭<br /><small>10pt</small></th>
+                <th>상관<br /><small>10pt</small></th>
+                <th>총점</th>
+                <th>레짐</th>
+                <th>액션</th>
+              </tr>
+            </thead>
+            <tbody id="score-tbody">
+              <!-- weeklyScore.js 가 채움 -->
+            </tbody>
+          </table>
+        </div>
+      </div><!-- /weekly-score-card -->
+
+    </div><!-- /two-column -->
+  </section><!-- /tab-portfolio -->
+
+  <!-- ══════════════════════════════════════════
+    탭 2: 배분 & 리스크
+    왼쪽: Core/Alpha 배분 제안
+    오른쪽: 10개 리스크 가드레일 현황
+  ══════════════════════════════════════════ -->
+  <section id="tab-allocation" class="tab-content hidden">
+    <div class="two-column">
+
+      <!-- 포트폴리오 배분 카드 -->
+      <div class="card">
+        <div class="card-header">
+          <h2>포트폴리오 배분</h2>
+          <button id="suggest-allocation-btn" class="btn-primary">배분 제안</button>
+        </div>
+
+        <!-- Core 배분: 100억을 40/30/30으로 자동 분배 -->
+        <div class="allocation-section">
+          <h3>Core 배분 (100억 KRW)</h3>
+          <div id="core-allocation-list" class="allocation-list">
+            <!-- allocationEngine.js 가 채움 -->
+          </div>
+        </div>
+
+        <!-- Alpha 배분: 점수 65점 이상 ETF에만 최대 30억 배분 -->
+        <div class="allocation-section">
+          <h3>Alpha 배분 (최대 30억 KRW)</h3>
+          <div id="alpha-allocation-list" class="allocation-list">
+            <!-- allocationEngine.js 가 채움 -->
+          </div>
+        </div>
+
+        <!-- 배분 요약: 총 노출 및 레버리지 비율 표시 -->
+        <div class="allocation-summary">
+          <div class="summary-item">
+            <span>총 노출:</span>
+            <span id="total-exposure">0억</span>
+          </div>
+          <div class="summary-item">
+            <span>레버리지:</span>
+            <span id="leverage-ratio">0%</span>
+          </div>
+        </div>
+      </div><!-- /배분 카드 -->
+
+      <!-- 리스크 가드레일 카드 -->
+      <div class="card">
+        <div class="card-header">
+          <h2>리스크 가드레일</h2>
+          <button id="check-risk-btn" class="btn-secondary">리스크 검증</button>
+        </div>
+
+        <!--
+          10개 가드레일: OK(초록)/WARN(노랑)/BLOCK(빨강) 3단계 상태
+          BLOCK이 하나라도 있으면 주문 생성 불가
+        -->
+        <div id="risk-guardrails" class="risk-guardrails">
+
+          <div class="guardrail-item" id="gr-total-exposure">
+            <span class="guardrail-name">총 노출 ≤130억</span>
+            <span class="guardrail-value">-</span>
+            <span class="guardrail-status">-</span>
+          </div>
+
+          <div class="guardrail-item" id="gr-leverage">
+            <span class="guardrail-name">레버리지 ≤30%</span>
+            <span class="guardrail-value">-</span>
+            <span class="guardrail-status">-</span>
+          </div>
+
+          <div class="guardrail-item" id="gr-short">
+            <span class="guardrail-name">숏 비중 ≤30%</span>
+            <span class="guardrail-value">-</span>
+            <span class="guardrail-status">-</span>
+          </div>
+
+          <div class="guardrail-item" id="gr-etf-count">
+            <span class="guardrail-name">ETF 수 &lt;10</span>
+            <span class="guardrail-value">-</span>
+            <span class="guardrail-status">-</span>
+          </div>
+
+          <div class="guardrail-item" id="gr-volatility">
+            <span class="guardrail-name">주간변동성 ≤1.5%</span>
+            <span class="guardrail-value">-</span>
+            <span class="guardrail-status">-</span>
+          </div>
+
+          <div class="guardrail-item" id="gr-var">
+            <span class="guardrail-name">95% VaR ≥-20억</span>
+            <span class="guardrail-value">-</span>
+            <span class="guardrail-status">-</span>
+          </div>
+
+          <div class="guardrail-item" id="gr-mdd">
+            <span class="guardrail-name">MDD -3% 트리거</span>
+            <span class="guardrail-value">-</span>
+            <span class="guardrail-status">-</span>
+          </div>
+
+          <div class="guardrail-item" id="gr-beta">
+            <span class="guardrail-name">베타 0.9~1.2</span>
+            <span class="guardrail-value">-</span>
+            <span class="guardrail-status">-</span>
+          </div>
+
+          <div class="guardrail-item" id="gr-single-etf">
+            <span class="guardrail-name">단일ETF ≤40억</span>
+            <span class="guardrail-value">-</span>
+            <span class="guardrail-status">-</span>
+          </div>
+
+          <div class="guardrail-item" id="gr-alpha-risk">
+            <span class="guardrail-name">알파리스크 ≤40%</span>
+            <span class="guardrail-value">-</span>
+            <span class="guardrail-status">-</span>
+          </div>
+
+        </div><!-- /risk-guardrails -->
+
+        <!-- 위반 항목 상세: BLOCK 항목이 있을 때만 표시 -->
+        <div id="risk-violations" class="risk-violations hidden"></div>
+      </div><!-- /리스크 카드 -->
+
+    </div><!-- /two-column -->
+  </section><!-- /tab-allocation -->
+
+  <!-- ══════════════════════════════════════════
+    탭 3: 주문 & 리포트
+    상단: 금요일 종가 기준 주문 테이블
+    하단: 제출용 보고서 생성 및 뷰어
+  ══════════════════════════════════════════ -->
+  <section id="tab-orders" class="tab-content hidden">
+
+    <!-- 주문 생성 카드 -->
+    <div class="card">
+      <div class="card-header">
+        <h2>주문 생성 (금요일 종가)</h2>
+        <div class="btn-group">
+          <button id="generate-orders-btn" class="btn-primary">주문 생성</button>
+          <!-- 주문 확정 버튼: 생성 후에만 표시하여 실수 방지 -->
+          <button id="confirm-orders-btn" class="btn-success hidden">주문 확정</button>
+        </div>
+      </div>
+
+      <div id="orders-table-container">
+        <table class="orders-table" id="orders-table">
+          <thead>
+            <tr>
+              <th>티커</th>
+              <th>이름</th>
+              <th>액션</th>
+              <th>금액(억)</th>
+              <th>비중</th>
+              <th>리스크</th>
+              <th>사유</th>
+            </tr>
+          </thead>
+          <tbody id="orders-tbody">
+            <!-- ordersReport.js 가 채움 -->
+          </tbody>
+        </table>
+      </div>
+    </div><!-- /주문 카드 -->
+
+    <!-- 리포트 생성 카드 -->
+    <div class="card">
+      <div class="card-header">
+        <h2>리포트 생성</h2>
+        <div class="btn-group">
+          <!-- 3종 보고서: 리스크 규칙 / 주문 리포트 / P&L 리포트 -->
+          <button id="gen-risk-rules-btn" class="btn-secondary">리스크 규칙</button>
+          <button id="gen-orders-report-btn" class="btn-secondary">Orders Report</button>
+          <button id="gen-pnl-report-btn" class="btn-secondary">P&amp;L Report</button>
+          <!-- 복사 버튼: 보고서 생성 후에만 표시 -->
+          <button id="copy-report-btn" class="btn-outline hidden">복사</button>
+        </div>
+      </div>
+
+      <!-- 보고서 뷰어: 마크다운 원문을 pre 태그로 표시 -->
+      <div id="report-viewer" class="report-viewer">
+        <pre id="report-content">리포트 생성 버튼을 클릭하세요.</pre>
+      </div>
+    </div><!-- /리포트 카드 -->
+
+  </section><!-- /tab-orders -->
+
+  <!-- ══════════════════════════════════════════
+    탭 4: P&L 추적
+    상단: 금요일 종가 입력 폼
+    하단: 주차별 성과 테이블 (vs 벤치마크)
+  ══════════════════════════════════════════ -->
+  <section id="tab-pnl" class="tab-content hidden">
+
+    <!-- P&L 업데이트 카드 -->
+    <div class="card">
+      <div class="card-header">
+        <h2>주간 P&amp;L 업데이트</h2>
+        <button id="update-pnl-btn" class="btn-primary">P&amp;L 업데이트</button>
+      </div>
+      <div class="pnl-input-form">
+        <p class="hint">금요일 종가를 입력하여 P&amp;L을 업데이트합니다.</p>
+
+        <!-- 벤치마크 ETF 가격 입력 (항상 표시)
+             포트폴리오 ETF 유니버스와 별도로 입력받는 이유:
+             벤치마크 3종(KODEX200, S&P500 헷지/언헷지)이 유니버스에 없어도
+             벤치마크 수익률은 항상 계산되어야 하기 때문 -->
+        <div class="benchmark-price-section">
+          <h4 style="color:var(--text-muted);font-size:0.82rem;margin-bottom:0.5rem;">
+            벤치마크 ETF 종가 (벤치마크 수익률 계산용)
+          </h4>
+          <div class="price-input-item">
+            <label>069500.KS KODEX 200</label>
+            <input type="number" id="bm-price-069500.KS" placeholder="금요일 종가" step="any" min="0" />
+          </div>
+          <div class="price-input-item">
+            <label>219480.KS S&amp;P500(H)</label>
+            <input type="number" id="bm-price-219480.KS" placeholder="금요일 종가" step="any" min="0" />
+          </div>
+          <div class="price-input-item">
+            <label>379800.KS S&amp;P500(U)</label>
+            <input type="number" id="bm-price-379800.KS" placeholder="금요일 종가" step="any" min="0" />
+          </div>
+        </div>
+        <hr style="border:none;border-top:1px solid var(--border);margin:0.75rem 0;" />
+        <h4 style="color:var(--text-muted);font-size:0.82rem;margin-bottom:0.5rem;">
+          포트폴리오 ETF 종가
+        </h4>
+
+        <!-- 가격 입력 리스트: weeklyPnL.js 가 유니버스 기반으로 동적 생성 -->
+        <div id="price-input-list" class="price-input-list"></div>
+      </div>
+    </div><!-- /P&L 업데이트 카드 -->
+
+    <!-- 성과 추적 카드 -->
+    <div class="card">
+      <div class="card-header">
+        <h2>성과 추적 (vs 벤치마크)</h2>
+      </div>
+      <!--
+        P&L 테이블: 7개 컬럼
+        Active Return = Portfolio Return - Benchmark Return
+        Net Return = Portfolio Return - 차입비용 + 현금이자
+      -->
+      <table class="pnl-table" id="pnl-table">
+        <thead>
+          <tr>
+            <th>Week</th>
+            <th>포트폴리오 수익</th>
+            <th>벤치마크 수익</th>
+            <th>초과수익 (α)</th>
+            <th>차입비용</th>
+            <th>순수익률</th>
+            <th>누적수익</th>
+          </tr>
+        </thead>
+        <tbody id="pnl-tbody">
+          <!-- weeklyPnL.js 가 채움 -->
+        </tbody>
+      </table>
+      <!-- 벤치마크 구성 안내 -->
+      <div class="benchmark-note">
+        벤치마크: KOSPI200 40% + S&amp;P500(H) 30% + S&amp;P500(U) 30%
+      </div>
+    </div><!-- /성과 추적 카드 -->
+
+    <!-- 누적 수익률 차트 카드
+         테이블 아래에 배치하는 이유:
+         데이터를 먼저 숫자로 확인한 뒤 추세를 시각적으로 파악하는 흐름이 자연스럽기 때문 -->
+    <div class="card">
+      <div class="card-header">
+        <h2>누적 수익률 추이</h2>
+        <span style="font-size:0.78rem;color:var(--text-muted);">포트폴리오 vs 벤치마크</span>
+      </div>
+      <!-- TradingView Lightweight Charts v4.2.0 컨테이너
+           배경색을 앱 배경과 일치시켜 카드 안에서 자연스럽게 보이도록 함 -->
+      <div id="pnl-chart-container" style="height:250px;background:#0d1117;border-radius:8px;"></div>
+      <div class="benchmark-note" style="margin-top:0.5rem;">
+        파란선: 포트폴리오 누적수익 | 회색선: 벤치마크 누적수익
+      </div>
+    </div><!-- /누적 수익률 차트 카드 -->
+
+  </section><!-- /tab-pnl -->
+
+  <!-- ══════════════════════════════════════════
+    탭 5: AI 투자위원회
+    왼쪽 사이드바: 역할(CIO/CRO/Research/Report Writer) 선택
+    오른쪽: 채팅 인터페이스
+    단타 매매 조언 대신 포트폴리오 리스크 관점으로 유도
+  ══════════════════════════════════════════ -->
+  <section id="tab-committee" class="tab-content hidden">
+    <div class="committee-layout">
+
+      <!-- 사이드바: 역할 및 컨텍스트 표시 -->
+      <div class="committee-sidebar">
+        <h3>역할 선택</h3>
+        <div class="role-buttons">
+          <button class="role-btn active" data-role="CIO Assistant">CIO 어시스턴트</button>
+          <button class="role-btn" data-role="CRO Checker">CRO 리스크 체커</button>
+          <button class="role-btn" data-role="Research Summarizer">리서치 요약</button>
+          <button class="role-btn" data-role="Report Writer">리포트 작성</button>
+        </div>
+
+        <!-- 현재 컨텍스트: AppState 요약을 표시하여 AI가 어떤 데이터를 알고 있는지 확인 -->
+        <div class="context-info">
+          <h4>현재 컨텍스트</h4>
+          <div id="context-summary" class="context-summary">
+            Week 1 | 포트폴리오 미설정
+          </div>
+        </div>
+      </div><!-- /committee-sidebar -->
+
+      <!-- 채팅 영역 -->
+      <div class="committee-chat">
+        <div id="chat-messages" class="chat-messages">
+          <!-- 환영 메시지: 역할과 과제 컨텍스트를 명확히 제시 -->
+          <div class="chat-msg assistant">
+            MarkovPortfolio V4 AI 투자위원회에 오신 것을 환영합니다.<br/>
+            역할을 선택하고 포트폴리오 리스크, 배분 전략, 보고서 작성에 대해 질문하세요.<br/>
+            <em>단타 매매 조언은 제공하지 않습니다.</em>
+          </div>
+        </div>
+
+        <!-- 채팅 입력 -->
+        <div class="chat-input-row">
+          <textarea
+            id="chat-input"
+            placeholder="투자 결정에 대해 질문하세요..."
+            rows="3"
+          ></textarea>
+          <button id="chat-send-btn" class="btn-primary">전송</button>
+        </div>
+      </div><!-- /committee-chat -->
+
+    </div><!-- /committee-layout -->
+  </section><!-- /tab-committee -->
+
+</main><!-- /app-main -->
+
+<!-- ══════════════════════════════════════════════════════════════
+  스크립트 로드 순서 (순서 중요!)
+
+  [1] CDN 라이브러리
+      - TradingView Lightweight Charts @4.2.0 고정 (v5 금지: addCandlestickSeries 제거됨)
+
+  [2] 전략 모듈 (strategy_engine.js보다 먼저 로드)
+      - regime_classifier, pullback_entry_strategy, weekly_etf_score_strategy를
+        먼저 로드해야 strategy_engine.js가 이를 참조할 수 있음
+
+  [3] 앱 상태 (AppState)
+      - 모든 모듈이 AppState를 참조하므로 가장 먼저 로드
+
+  [4] 엔진 모듈 (계산 로직)
+      - allocationEngine, riskBudget: UI보다 먼저 로드
+
+  [5] UI 모듈
+      - etfUniverse, weeklyScore, ordersReport, weeklyPnL, aiCommittee
+
+  [6] 앱 진입점 (app.js)
+      - 모든 모듈 로드 완료 후 DOMContentLoaded에서 초기화
+══════════════════════════════════════════════════════════════ -->
+
+<!-- [1] CDN 라이브러리 -->
+<script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
+
+<!-- [2] 전략 모듈 -->
+<script src="/static/strategies/regime_classifier.js?v=20260504"></script>
+<script src="/static/strategies/pullback_entry_strategy.js?v=20260504"></script>
+<script src="/static/strategies/weekly_etf_score_strategy.js?v=20260504"></script>
+<script src="/static/strategies/strategy_engine.js?v=20260504"></script>
+
+<!-- [3] 앱 상태 (최우선 로드) -->
+<script src="/static/modules/appState.js?v=20260504"></script>
+
+<!-- [4] 엔진 모듈 -->
+<script src="/static/modules/allocationEngine.js?v=20260504"></script>
+<script src="/static/modules/riskBudget.js?v=20260504"></script>
+
+<!-- [5] UI 모듈 -->
+<script src="/static/modules/etfUniverse.js?v=20260504"></script>
+<script src="/static/modules/weeklyScore.js?v=20260504"></script>
+<script src="/static/modules/ordersReport.js?v=20260504"></script>
+<script src="/static/modules/weeklyPnL.js?v=20260504"></script>
+<script src="/static/modules/aiCommittee.js?v=20260504"></script>
+
+<!-- [6] 앱 진입점 -->
+<script src="/static/app.js?v=20260504"></script>
+
+</body>
+</html>

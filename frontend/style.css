@@ -1,0 +1,1086 @@
+/* ══════════════════════════════════════════════════════════════
+   MarkovPortfolio V4 — 다크 포트폴리오 테마
+   V2의 #0d1117 배경 다크 테마를 계승합니다.
+   왜 다크 테마인가: 장시간 차트·데이터 모니터링 시 눈의 피로를 줄이기 위함.
+   색상 팔레트 변경점: V2의 #00d4ff(청록) 강조색 → #58a6ff(GitHub 블루)로 변경.
+   이유: 포트폴리오 관리 UI는 트레이딩보다 차분하고 신뢰감 있는 색상이 어울리기 때문.
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── CSS 변수 (토큰 시스템) ────────────────────────────────────── */
+:root {
+  --bg:           #0d1117;   /* 최상위 배경: GitHub Dark 배경색과 동일 */
+  --bg-card:      #161b22;   /* 카드 배경: 배경보다 살짝 밝게 */
+  --bg-hover:     #21262d;   /* 호버 상태 배경 */
+  --border:       #30363d;   /* 기본 테두리 */
+  --text:         #c9d1d9;   /* 기본 텍스트 */
+  --text-muted:   #8b949e;   /* 보조 텍스트 */
+  --accent:       #58a6ff;   /* 강조색 (링크, 활성 탭 등) */
+  --success:      #3fb950;   /* 성공/롱/증가 */
+  --warn:         #d29922;   /* 경고/중립 */
+  --danger:       #f85149;   /* 위험/숏/감소 */
+  --purple:       #a78bfa;   /* Tactical 역할 색상 */
+  --header-h:     52px;      /* 헤더 높이: padding-top에 맞춰 사용 */
+  --radius:       8px;       /* 기본 border-radius */
+  --radius-lg:    12px;      /* 카드 border-radius */
+  --font:         'Segoe UI', 'Noto Sans KR', system-ui, sans-serif;
+}
+
+/* ── 리셋 + 기본 ─────────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  height: 100%;
+}
+
+body {
+  /* V2와 동일한 배경색 계승 */
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.5;
+  min-height: 100%;
+}
+
+/* ── 스크롤바 커스텀 ─────────────────────────────────────────── */
+/* V2와 동일한 방식으로 다크 테마에 어울리게 스타일링 */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track  { background: var(--bg); }
+::-webkit-scrollbar-thumb  { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #484f58; }
+
+/* ══════════════════════════════════════════════════════════════
+   앱 헤더
+   sticky로 상단 고정: 긴 콘텐츠를 스크롤해도 탭 전환 가능하게 하기 위함
+   ══════════════════════════════════════════════════════════════ */
+.app-header {
+  position: sticky;
+  top: 0;
+  height: var(--header-h);
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 1.25rem;
+  gap: 1rem;
+  z-index: 100;
+  /* 긴 헤더에서 내용이 밀릴 경우 감싸지 않도록 */
+  flex-wrap: nowrap;
+  overflow: hidden;
+}
+
+/* 로고 */
+.logo {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+.logo .version {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-weight: 400;
+  margin-left: 2px;
+}
+
+/* Week 선택기 */
+.week-selector {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  white-space: nowrap;
+}
+.week-selector label {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+.week-selector select {
+  background: var(--bg-hover);
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: 0.3rem 0.5rem;
+  border-radius: var(--radius);
+  font-size: 0.82rem;
+  cursor: pointer;
+  outline: none;
+}
+.week-selector select:focus {
+  border-color: var(--accent);
+}
+
+/* 탭 네비게이션 */
+.tab-nav {
+  display: flex;
+  gap: 0.2rem;
+}
+
+.tab-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-muted);
+  padding: 0.4rem 0.85rem;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-family: var(--font);
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.tab-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+.tab-btn.active {
+  /* 활성 탭: 강조색으로 명확히 구분 */
+  color: var(--accent);
+  border-color: var(--accent);
+  background: rgba(88, 166, 255, 0.08);
+}
+
+/* 금요일 종가 실행 배지 */
+.execution-badge {
+  /* 헤더 오른쪽 끝 정렬: margin-left auto로 나머지 공간 소비 */
+  margin-left: auto;
+  background: rgba(88, 166, 255, 0.08);
+  border: 1px solid rgba(88, 166, 255, 0.25);
+  color: var(--accent);
+  padding: 0.25rem 0.7rem;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   메인 컨텐츠
+   header가 sticky이므로 overflow:auto로 스크롤 허용
+   ══════════════════════════════════════════════════════════════ */
+.app-main {
+  padding: 1.25rem 1.5rem;
+  max-width: 1600px;
+  margin: 0 auto;
+}
+
+/* ── 탭 컨텐츠 ───────────────────────────────────────────────── */
+.tab-content {
+  display: block;
+}
+.tab-content.hidden {
+  /* !important: JS에서 class를 추가했을 때 다른 display 설정을 덮어쓰기 위함 */
+  display: none !important;
+}
+
+/* ── 2컬럼 그리드 레이아웃 ──────────────────────────────────── */
+.two-column {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   카드 컴포넌트
+   V2의 bg-card/border 스타일을 그대로 계승
+   ══════════════════════════════════════════════════════════════ */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.1rem 1.25rem;
+  margin-bottom: 1.25rem;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.9rem;
+  padding-bottom: 0.7rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.card-header h2 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #e6edf3;
+}
+
+/* allocation-section 내부 서브 제목 */
+.allocation-section h3,
+.card-header h3 {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   버튼 시스템
+   V2의 .btn 패턴을 V4 방식(독립 클래스)으로 재설계
+   ══════════════════════════════════════════════════════════════ */
+.btn-primary {
+  background: #238636;
+  color: #fff;
+  border: none;
+  padding: 0.38rem 0.9rem;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-family: var(--font);
+  font-weight: 500;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+.btn-primary:hover { background: #2ea043; }
+.btn-primary:disabled {
+  /* 비활성 상태: 흐릿하게 표시하여 클릭 불가임을 시각적으로 전달 */
+  background: #1c2128;
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: var(--bg-hover);
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: 0.38rem 0.9rem;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-family: var(--font);
+  font-weight: 500;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.btn-secondary:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* 주문 확정 버튼: 파란색으로 강조하여 중요한 액션임을 표시 */
+.btn-success {
+  background: #1f6feb;
+  color: #fff;
+  border: none;
+  padding: 0.38rem 0.9rem;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-family: var(--font);
+  font-weight: 500;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+.btn-success:hover { background: #388bfd; }
+
+/* 복사/내보내기 버튼: 테두리만 있는 미니멀 스타일 */
+.btn-outline {
+  background: none;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  padding: 0.38rem 0.9rem;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-family: var(--font);
+  font-weight: 500;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.btn-outline:hover {
+  background: rgba(88, 166, 255, 0.1);
+}
+
+/* 버튼 그룹: 여러 버튼을 한 줄에 배치 */
+.btn-group {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   ETF 유니버스 컴포넌트
+   ══════════════════════════════════════════════════════════════ */
+
+/* ETF 추가 폼: flex wrap으로 좁은 화면에서도 깔끔하게 배치 */
+.etf-add-form {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.9rem;
+  align-items: center;
+}
+.etf-add-form input,
+.etf-add-form select {
+  background: var(--bg-hover);
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: 0.35rem 0.55rem;
+  border-radius: var(--radius);
+  font-size: 0.82rem;
+  font-family: var(--font);
+  outline: none;
+}
+.etf-add-form input:focus,
+.etf-add-form select:focus {
+  border-color: var(--accent);
+}
+.etf-add-form input {
+  flex: 1;
+  min-width: 110px;
+}
+
+/* ETF 개수 배지 */
+.count-badge {
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  padding: 0.15rem 0.55rem;
+  border-radius: 20px;
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+/* 7-8개: 경고색 */
+.count-badge.warning {
+  border-color: var(--warn);
+  color: var(--warn);
+}
+/* 9개 이상: 위험색 (한도 초과 직전) */
+.count-badge.danger {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+/* ETF 목록 */
+.etf-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+/* ETF 아이템 카드 */
+.etf-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.5rem 0.7rem;
+}
+.etf-item .ticker {
+  font-weight: 600;
+  color: var(--accent);
+  font-size: 0.85rem;
+  min-width: 90px;
+}
+.etf-item .name {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  flex: 1;
+}
+.etf-item .remove-btn {
+  background: none;
+  border: none;
+  color: var(--danger);
+  cursor: pointer;
+  font-size: 0.82rem;
+  padding: 0.15rem 0.3rem;
+  border-radius: 4px;
+  transition: background 0.1s;
+  line-height: 1;
+}
+.etf-item .remove-btn:hover {
+  background: rgba(248, 81, 73, 0.12);
+}
+
+/* ── 역할 배지 ──────────────────────────────────────────────── */
+/* role별로 색상을 다르게 하여 배분 목적을 한눈에 파악 */
+.role-badge {
+  font-size: 0.68rem;
+  padding: 0.12rem 0.45rem;
+  border-radius: 20px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.role-badge.Core     { background: rgba(31,111,235,0.18);  color: #388bfd; border: 1px solid rgba(56,139,253,0.3); }
+.role-badge.Alpha    { background: rgba(63,185,80,0.15);   color: #3fb950; border: 1px solid rgba(63,185,80,0.3); }
+.role-badge.Hedge    { background: rgba(210,153,34,0.15);  color: #d29922; border: 1px solid rgba(210,153,34,0.3); }
+.role-badge.Tactical { background: rgba(167,139,250,0.15); color: var(--purple); border: 1px solid rgba(167,139,250,0.3); }
+.role-badge.Short    { background: rgba(248,81,73,0.15);   color: var(--danger); border: 1px solid rgba(248,81,73,0.3); }
+
+/* ══════════════════════════════════════════════════════════════
+   주간 신호 점수 테이블
+   ══════════════════════════════════════════════════════════════ */
+.score-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+.score-table th,
+.score-table td {
+  padding: 0.45rem 0.35rem;
+  text-align: center;
+  border-bottom: 1px solid var(--border);
+}
+.score-table th {
+  color: var(--text-muted);
+  font-weight: 500;
+  font-size: 0.78rem;
+  /* 헤더 배경 고정: 스크롤 시 헤더가 보이도록 */
+  position: sticky;
+  top: 0;
+  background: var(--bg-card);
+}
+.score-table td:first-child {
+  /* 티커 컬럼: 왼쪽 정렬로 가독성 향상 */
+  text-align: left;
+  font-weight: 600;
+  color: var(--accent);
+}
+.score-table tr:hover td {
+  background: var(--bg-hover);
+}
+
+/* ── 액션 배지 ──────────────────────────────────────────────── */
+/* 총점 구간별 액션: 색상 코딩으로 즉각적인 인식 */
+.action-badge {
+  font-size: 0.7rem;
+  padding: 0.12rem 0.45rem;
+  border-radius: 20px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.action-badge.Increase  { background: rgba(63,185,80,0.15);  color: var(--success); }
+.action-badge.Small-Buy { background: rgba(31,111,235,0.15); color: #388bfd; }
+.action-badge.Hold      { background: var(--bg-hover);        color: var(--text-muted); }
+.action-badge.Reduce    { background: rgba(210,153,34,0.15);  color: var(--warn); }
+.action-badge.Exit      { background: rgba(248,81,73,0.15);   color: var(--danger); }
+.action-badge.No-Buy    { background: rgba(248,81,73,0.12);   color: var(--danger); }
+
+/* ── 레짐 배지 ──────────────────────────────────────────────── */
+/* Risk-On/Neutral/Risk-Off: 신호등 색상 체계 */
+.regime-badge {
+  font-size: 0.7rem;
+  padding: 0.12rem 0.45rem;
+  border-radius: 20px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.regime-badge.Risk-On  { background: rgba(63,185,80,0.15);  color: var(--success); }
+.regime-badge.Neutral  { background: rgba(210,153,34,0.15); color: var(--warn); }
+.regime-badge.Risk-Off { background: rgba(248,81,73,0.15);  color: var(--danger); }
+
+/* ══════════════════════════════════════════════════════════════
+   포트폴리오 배분 컴포넌트
+   ══════════════════════════════════════════════════════════════ */
+.allocation-section {
+  margin-bottom: 1rem;
+}
+.allocation-section h3 {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  margin-bottom: 0.45rem;
+  font-weight: 500;
+}
+
+.allocation-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+/* 각 배분 항목 */
+.allocation-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.45rem 0.7rem;
+  background: var(--bg-hover);
+  border-radius: var(--radius);
+  font-size: 0.82rem;
+}
+.allocation-item .alloc-ticker {
+  font-weight: 600;
+  color: var(--accent);
+  min-width: 100px;
+}
+.allocation-item .alloc-amount {
+  color: var(--text);
+  font-family: monospace;
+}
+.allocation-item .alloc-weight {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+/* 배분 요약 섹션 */
+.allocation-summary {
+  display: flex;
+  gap: 1.5rem;
+  padding-top: 0.7rem;
+  border-top: 1px solid var(--border);
+  margin-top: 0.7rem;
+}
+.summary-item {
+  display: flex;
+  gap: 0.45rem;
+  align-items: center;
+}
+.summary-item span:first-child {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+.summary-item span:last-child {
+  color: #e6edf3;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   리스크 가드레일 컴포넌트
+   OK/WARN/BLOCK 3단계 상태를 왼쪽 테두리 색상으로 표현
+   ══════════════════════════════════════════════════════════════ */
+.risk-guardrails {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.guardrail-item {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.45rem 0.7rem;
+  background: var(--bg-hover);
+  border-radius: var(--radius);
+  /* 기본 상태: 회색 왼쪽 테두리 */
+  border-left: 3px solid var(--border);
+  transition: border-color 0.2s;
+}
+.guardrail-item.ok   { border-left-color: var(--success); }
+.guardrail-item.warn { border-left-color: var(--warn); }
+.guardrail-item.block {
+  border-left-color: var(--danger);
+  /* BLOCK 상태: 배경도 약하게 빨간색으로 경고 강조 */
+  background: rgba(248, 81, 73, 0.06);
+}
+
+.guardrail-name {
+  flex: 1;
+  font-size: 0.83rem;
+  color: var(--text);
+}
+.guardrail-value {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  font-family: monospace;
+  min-width: 70px;
+  text-align: right;
+}
+.guardrail-status {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.12rem 0.4rem;
+  border-radius: 4px;
+  min-width: 45px;
+  text-align: center;
+}
+.guardrail-item.ok    .guardrail-status { color: var(--success); }
+.guardrail-item.warn  .guardrail-status { color: var(--warn); }
+.guardrail-item.block .guardrail-status { color: var(--danger); }
+
+/* 위반 항목 상세 박스 */
+.risk-violations {
+  margin-top: 0.75rem;
+  padding: 0.7rem;
+  background: rgba(248, 81, 73, 0.08);
+  border: 1px solid rgba(248, 81, 73, 0.25);
+  border-radius: var(--radius);
+  font-size: 0.82rem;
+  color: var(--danger);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   주문 테이블
+   ══════════════════════════════════════════════════════════════ */
+.orders-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.83rem;
+}
+.orders-table th,
+.orders-table td {
+  padding: 0.55rem 0.7rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+.orders-table th {
+  color: var(--text-muted);
+  font-weight: 500;
+  font-size: 0.78rem;
+}
+.orders-table tr:hover td {
+  background: var(--bg-hover);
+}
+
+/* 주문 액션 색상 */
+.order-action {
+  font-weight: 700;
+  font-size: 0.78rem;
+  padding: 0.12rem 0.4rem;
+  border-radius: 4px;
+}
+.order-action.BUY    { color: var(--success); }
+.order-action.SELL   { color: var(--danger); }
+.order-action.HOLD   { color: var(--text-muted); }
+.order-action.REDUCE { color: var(--warn); }
+.order-action.SHORT  { color: var(--danger); font-style: italic; }
+.order-action.COVER  { color: var(--purple); }
+
+/* 리스크 체크 상태 */
+.risk-check.OK    { color: var(--success); font-weight: 600; }
+.risk-check.WARN  { color: var(--warn);    font-weight: 600; }
+.risk-check.BLOCK { color: var(--danger);  font-weight: 600; }
+
+/* ══════════════════════════════════════════════════════════════
+   리포트 뷰어
+   Markdown/텍스트 리포트를 모노스페이스로 표시
+   ══════════════════════════════════════════════════════════════ */
+.report-viewer {
+  background: var(--bg-hover);
+  border-radius: var(--radius);
+  padding: 1rem;
+  margin-top: 0.9rem;
+  max-height: 520px;
+  overflow-y: auto;
+}
+.report-viewer pre {
+  font-family: 'Consolas', 'Courier New', monospace;
+  font-size: 0.8rem;
+  white-space: pre-wrap;
+  /* 줄바꿈이 있는 긴 라인도 컨테이너 밖으로 나가지 않게 */
+  word-break: break-word;
+  color: var(--text);
+  line-height: 1.65;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   P&L 테이블
+   ══════════════════════════════════════════════════════════════ */
+.pnl-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.83rem;
+}
+.pnl-table th,
+.pnl-table td {
+  padding: 0.55rem 0.7rem;
+  /* 숫자 컬럼: 오른쪽 정렬이 읽기 편함 */
+  text-align: right;
+  border-bottom: 1px solid var(--border);
+}
+.pnl-table th {
+  text-align: center;
+  color: var(--text-muted);
+  font-weight: 500;
+  font-size: 0.78rem;
+}
+.pnl-table td:first-child {
+  /* Week 컬럼: 가운데 정렬 */
+  text-align: center;
+  font-weight: 600;
+}
+.pnl-table tr:hover td {
+  background: var(--bg-hover);
+}
+
+/* 수익/손실 색상 */
+.pnl-positive { color: var(--success); }
+.pnl-negative { color: var(--danger); }
+
+/* 벤치마크 설명 주석 */
+.benchmark-note {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  margin-top: 0.7rem;
+  text-align: right;
+}
+
+/* P&L 입력 폼 */
+.pnl-input-form {
+  margin-top: 0.5rem;
+}
+.price-input-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin-top: 0.7rem;
+}
+.price-input-item {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+.price-input-item label {
+  width: 160px;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.price-input-item input {
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 0.35rem 0.55rem;
+  border-radius: var(--radius);
+  width: 140px;
+  font-size: 0.82rem;
+  font-family: monospace;
+  outline: none;
+}
+.price-input-item input:focus {
+  border-color: var(--accent);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   AI 투자위원회 레이아웃
+   왼쪽 사이드바(역할/컨텍스트) + 오른쪽 채팅 영역
+   ══════════════════════════════════════════════════════════════ */
+.committee-layout {
+  display: grid;
+  /* 사이드바: 고정 폭 / 채팅: 나머지 공간 */
+  grid-template-columns: 260px 1fr;
+  gap: 1.25rem;
+  /* 헤더 높이를 뺀 나머지 뷰포트 높이 */
+  height: calc(100vh - var(--header-h) - 2.5rem);
+}
+
+/* 사이드바 */
+.committee-sidebar {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  overflow-y: auto;
+}
+.committee-sidebar h3 {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* 역할 버튼 목록 */
+.role-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.role-btn {
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  padding: 0.45rem 0.7rem;
+  border-radius: var(--radius);
+  cursor: pointer;
+  text-align: left;
+  font-size: 0.83rem;
+  font-family: var(--font);
+  transition: all 0.15s;
+}
+.role-btn:hover {
+  background: var(--border);
+  color: var(--text);
+}
+.role-btn.active {
+  /* 선택된 역할: 강조색 테두리와 배경 */
+  background: rgba(88, 166, 255, 0.1);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* 컨텍스트 정보 박스 */
+.context-info {
+  flex: 1;
+}
+.context-info h4 {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-bottom: 0.4rem;
+}
+.context-summary {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  line-height: 1.65;
+  /* 컨텍스트가 길 경우 스크롤 */
+  overflow-y: auto;
+}
+
+/* 채팅 영역 */
+.committee-chat {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* 채팅 메시지 목록 */
+.chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+/* 채팅 말풍선 */
+.chat-msg {
+  max-width: 78%;
+  padding: 0.7rem 0.9rem;
+  border-radius: var(--radius-lg);
+  font-size: 0.87rem;
+  line-height: 1.55;
+  word-break: break-word;
+}
+.chat-msg.user {
+  /* 사용자 메시지: 오른쪽 정렬, 파란 배경 */
+  background: #1f6feb;
+  color: #fff;
+  align-self: flex-end;
+  border-bottom-right-radius: 4px;
+}
+.chat-msg.assistant {
+  /* AI 메시지: 왼쪽 정렬, 카드 배경 */
+  background: var(--bg-hover);
+  color: var(--text);
+  align-self: flex-start;
+  border-bottom-left-radius: 4px;
+  border: 1px solid var(--border);
+}
+.chat-msg.assistant em {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* 채팅 입력 영역 */
+.chat-input-row {
+  display: flex;
+  gap: 0.7rem;
+  padding: 0.9rem 1.1rem;
+  border-top: 1px solid var(--border);
+  align-items: flex-end;
+}
+.chat-input-row textarea {
+  flex: 1;
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: var(--radius);
+  padding: 0.55rem 0.7rem;
+  font-size: 0.87rem;
+  font-family: var(--font);
+  resize: none;
+  outline: none;
+  line-height: 1.5;
+}
+.chat-input-row textarea:focus {
+  border-color: var(--accent);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   유틸리티 클래스
+   ══════════════════════════════════════════════════════════════ */
+/* 숨김: !important로 JS의 display 설정을 강제 덮어쓰기 */
+.hidden { display: none !important; }
+
+/* 로딩 안내 */
+.loading {
+  color: var(--text-muted);
+  font-size: 0.83rem;
+  padding: 0.5rem 0;
+  /* pulse 애니메이션: 계산 중임을 시각적으로 표시 */
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+/* 힌트 텍스트 */
+.hint {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  margin-bottom: 0.4rem;
+}
+
+/* 빈 상태 안내 */
+.empty-state {
+  padding: 2.5rem 1rem;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+/* ── 배분 목록 제거 버튼 ───────────────────────────────────── */
+.alloc-remove-btn {
+  background: none;
+  border: none;
+  color: #484f58;
+  cursor: pointer;
+  font-size: 0.75rem;
+  padding: 0.1rem 0.3rem;
+  border-radius: 4px;
+  transition: color 0.15s, background 0.15s;
+  flex-shrink: 0;
+}
+.alloc-remove-btn:hover { color: var(--danger); background: rgba(248,81,73,0.1); }
+
+/* ── 후보 ETF 칩 ──────────────────────────────────────────── */
+.candidate-group { margin-bottom: 0.75rem; }
+.candidate-group-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-bottom: 0.3rem;
+  font-weight: 500;
+}
+.candidate-chips { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.candidate-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: #1c2128;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 0.22rem 0.6rem;
+  cursor: pointer;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.candidate-chip:hover:not([disabled]) {
+  background: #21262d;
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.candidate-chip.added {
+  background: rgba(35, 134, 54, 0.12);
+  border-color: rgba(63, 185, 80, 0.4);
+  color: var(--success);
+  cursor: default;
+}
+.candidate-chip.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.chip-ticker { font-weight: 600; font-family: monospace; font-size: 0.72rem; }
+.chip-label  { color: inherit; }
+.chip-check  { color: var(--success); font-size: 0.75rem; }
+.chip-core   {
+  font-size: 0.62rem;
+  background: rgba(56, 139, 253, 0.15);
+  color: var(--accent);
+  border-radius: 4px;
+  padding: 0.05rem 0.3rem;
+}
+
+/* ── 애니메이션 ─────────────────────────────────────────────── */
+/* pulse: 로딩 상태에서 깜빡임 효과 — V2와 동일한 방식 */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.35; }
+}
+
+/* ── 점수 근거 툴팁 ─────────────────────────────────────────────
+   마우스 오버 시 점수 계산 근거를 카드 하단에 sticky 패널로 표시합니다.
+   position:sticky bottom:0 을 사용하는 이유:
+     - 테이블이 길어도 스크롤 없이 카드 하단에 고정되어 항상 보임
+     - absolute 위치잡기보다 HTML 흐름을 해치지 않아 레이아웃이 안정적
+   ════════════════════════════════════════════════════════════════ */
+.score-row-hover {
+  /* 클릭 가능한 행임을 손가락 커서로 암시 */
+  cursor: pointer;
+}
+.score-row-hover:hover {
+  /* 강조색(accent) 10% 불투명도: 기존 .score-table tr:hover td 와 함께 작동 */
+  background: rgba(88, 166, 255, 0.06);
+}
+
+.score-tooltip {
+  position: sticky;
+  bottom: 0;
+  background: #1c2128;
+  border: 1px solid #388bfd50;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  margin-top: 0.75rem;
+  font-size: 0.8rem;
+  line-height: 1.6;
+  color: #c9d1d9;
+}
+.tooltip-line {
+  padding: 0.15rem 0;
+  /* 항목 간 구분선: 너무 진하지 않게 12.5% 불투명도로 설정 */
+  border-bottom: 1px solid #30363d20;
+}
+.tooltip-line:last-child {
+  /* 마지막 항목은 구분선 불필요 */
+  border-bottom: none;
+}
+
+/* ── 배분 금액 수동 편집 ───────────────────────────────────────
+   왜 dashed 밑줄인가: 편집 가능한 필드임을 암시하는 관습적 UI 패턴.
+   solid 테두리 대신 dashed를 써서 "정상 표시" 상태와 구분합니다.
+   ──────────────────────────────────────────────────────────── */
+.editable-amount {
+  cursor: pointer;
+  border-bottom: 1px dashed #484f58;
+  transition: border-color 0.15s;
+}
+.editable-amount:hover {
+  border-bottom-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   반응형 레이아웃
+   LG Gram 16"(DPR 1.25) 기준으로 최적화
+   ══════════════════════════════════════════════════════════════ */
+
+/* 좁은 화면: 2컬럼 → 1컬럼으로 전환 */
+@media (max-width: 1100px) {
+  .two-column { grid-template-columns: 1fr; }
+  .committee-layout { grid-template-columns: 1fr; height: auto; }
+  .committee-sidebar { order: -1; }
+}
+
+/* 태블릿 이하 */
+@media (max-width: 768px) {
+  .app-main { padding: 0.9rem; }
+  .tab-btn { padding: 0.35rem 0.6rem; font-size: 0.78rem; }
+  .execution-badge { display: none; }
+}
+
+/* 모바일 */
+@media (max-width: 480px) {
+  .week-selector { display: none; }
+  .app-header { gap: 0.5rem; }
+}
+
+/* ── 벤치마크 가격 입력 섹션 ────────────────────────────────
+   포트폴리오 ETF 입력과 시각적으로 구분하기 위해
+   아래 여백을 주어 구분선 전 여유 공간을 확보한다 */
+.benchmark-price-section { margin-bottom: 0.75rem; }

@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+
+# 환경변수 (API 키 포함 - 절대 커밋 금지)
+.env
+*.env
+
+# 데이터 파일 (로컬 과제 데이터)
+data/
+
+# IDE
+.vscode/
+.idea/
+
+# 캐시
+*.cache
+.cache/
