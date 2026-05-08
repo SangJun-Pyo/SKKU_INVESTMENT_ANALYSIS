@@ -70,8 +70,7 @@ window.AllocationEngine = (() => {
 
       const snapshot = await res.json();
       /* AllocationSuggestResponse → AppState.portfolio 변환
-         서버 응답 필드: { positions, total_exposure, leverage_ratio, cash_remaining, week, warnings }
-         AppState.update 미존재 → AppState.set 사용 */
+         서버 응답 필드: { positions, total_exposure, leverage_ratio, cash_remaining, week, warnings, volume_warnings } */
       const baseCapital = AppState.get('baseCapital');
       const totalExp    = snapshot.total_exposure || 0;
       const borrowed    = Math.max(0, totalExp - baseCapital);
@@ -81,6 +80,9 @@ window.AllocationEngine = (() => {
         totalExposure: totalExp,
         positions:     snapshot.positions || [],
       });
+
+      /* 거래량 캡 경고 표시 */
+      _renderVolumeWarnings(snapshot.volume_warnings || [], snapshot.warnings || []);
 
       console.log('[AllocationEngine] 배분 제안 완료:', snapshot);
 
@@ -171,6 +173,54 @@ window.AllocationEngine = (() => {
       totalExposure: totalAlloc,
       positions,
     });
+  }
+
+  /* ══════════════════════════════════════════════════════════
+     거래량 캡 경고 표시
+     거래량 부족으로 배분액이 감액된 ETF를 배분 섹션 상단에 표시합니다.
+  ══════════════════════════════════════════════════════════ */
+  function _renderVolumeWarnings(volumeWarnings, generalWarnings) {
+    /* 기존 경고 패널 제거 후 재생성 */
+    const existing = document.getElementById('allocation-volume-warnings');
+    if (existing) existing.remove();
+
+    const allWarnings = [...volumeWarnings, ...generalWarnings];
+    if (allWarnings.length === 0) return;
+
+    const card = document.querySelector('#tab-allocation .card');
+    if (!card) return;
+
+    const panel = document.createElement('div');
+    panel.id = 'allocation-volume-warnings';
+    panel.style.cssText = [
+      'background:rgba(210,153,34,0.08)',
+      'border:1px solid rgba(210,153,34,0.35)',
+      'border-radius:8px',
+      'padding:0.65rem 0.9rem',
+      'margin-bottom:0.9rem',
+      'font-size:0.8rem',
+    ].join(';');
+
+    const title = volumeWarnings.length > 0
+      ? `⚠️ 거래량 캡 적용 (${volumeWarnings.length}개 ETF 감액)`
+      : '⚠️ 배분 경고';
+
+    panel.innerHTML = `
+      <div style="font-weight:600;color:#d29922;margin-bottom:0.4rem;">${title}</div>
+      ${allWarnings.map(w => `
+        <div style="color:#c9d1d9;margin:0.2rem 0;padding-left:0.5rem;border-left:2px solid #d29922;">
+          ${w}
+        </div>
+      `).join('')}
+    `;
+
+    /* 카드 헤더 바로 아래에 삽입 */
+    const header = card.querySelector('.card-header');
+    if (header) {
+      header.insertAdjacentElement('afterend', panel);
+    } else {
+      card.prepend(panel);
+    }
   }
 
   /* ══════════════════════════════════════════════════════════

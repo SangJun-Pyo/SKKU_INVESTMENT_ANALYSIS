@@ -37,8 +37,8 @@ BENCHMARK_ETF_MAP: dict[str, dict] = {
         "weight":  CLASS_BENCHMARK["kospi200"],               # 0.40
     },
     "sp500Hedged": {
-        "ticker":  "219480.KS",
-        "name":    "KODEX S&P500선물(H)",
+        "ticker":  "449180.KS",
+        "name":    "KODEX 미국S&P500(H)",
         "amount":  DEFAULT_CORE_ALLOCATION["sp500HedgedCore"],  # 30억
         "weight":  CLASS_BENCHMARK["sp500Hedged"],              # 0.30
     },
@@ -103,6 +103,7 @@ def allocate_alpha(
     scores: list[WeeklySignalScore],
     current_positions: list[PortfolioPosition],
     max_alpha: float = MAX_ALPHA_EXPOSURE,
+    volume_caps: Optional[dict[str, float]] = None,  # {ticker: 최대 KRW 주문 금액}
 ) -> list[PortfolioPosition]:
     """
     점수 기반 Alpha 포지션 배분
@@ -112,12 +113,17 @@ def allocate_alpha(
     - 65-79점 (Small Buy): 소량 배분 — 정상 배분의 50% 감액
     - 64점 미만 (Hold/Reduce/Exit): 배분 없음
     - 단일 ETF 최대 MAX_SINGLE_ALPHA_AMOUNT(40억) 제한
+    - 거래량 캡(목요일 거래량 × 25% × 현재가) 초과 시 추가 감액
 
     이미 Core로 배분된 티커는 Alpha 중복 배분에서 제외합니다.
     — Core와 Alpha에 같은 ETF가 들어가면 포지션 관리가 복잡해집니다.
 
     변동성 위반(volatility_score < 5) ETF는 배분 금액을 50% 추가 감액합니다.
     — 고변동 ETF에 집중 투자하면 포트폴리오 전체 리스크가 급격히 증가합니다.
+
+    volume_caps: {ticker: 최대 KRW 주문 금액} 딕셔너리
+    — service_market.get_volume_cap()으로 사전 계산하여 전달합니다.
+    — None이면 거래량 제한 없이 배분합니다.
     """
     if not scores:
         return []
@@ -163,7 +169,14 @@ def allocate_alpha(
         # MAX_SINGLE_ALPHA_AMOUNT를 초과하는 배분은 잘라냅니다.
         capped_amount = min(raw_amount, MAX_SINGLE_ALPHA_AMOUNT)
 
-        # 배분 금액이 500만원 미만이면 제외 (ETF 수가 많아도 대부분 포함)
+        # 거래량 캡 적용 (목요일 거래량 × 25% × 현재가)
+        # 저유동성 ETF에 초과 배분하면 실제 체결 시 시장 충격이 발생하므로 사전에 방지합니다.
+        if volume_caps and s.ticker in volume_caps:
+            vol_cap = volume_caps[s.ticker]
+            if vol_cap is not None and vol_cap < capped_amount:
+                capped_amount = vol_cap
+
+        # 배분 금액이 500만원 미만이면 제외 (거래량 캡으로 인한 소액 배분 방지 포함)
         if capped_amount < 5_000_000:
             continue
 
@@ -258,8 +271,13 @@ def suggest_portfolio(
     # universe를 전달하여 사용자가 등록한 Core ETF만 배분합니다.
     core_positions = build_benchmark_core(universe)
 
+    # Core ETF 티커 집합: volume_caps 계산 시 Core는 제외하기 위해 미리 추출합니다.
+    # Core ETF는 벤치마크 복제 목적으로 고정 금액을 배분하므로 거래량 캡 적용 대상이 아닙니다.
+    core_positions_tickers = {pos.ticker for pos in core_positions}
+
     # 2단계: Alpha 배분 (선택적)
     alpha_positions = []
+    volume_caps: dict[str, float] = {}  # 프론트엔드 표시 및 로깅용으로 함수 스코프 밖에서 선언
     if use_alpha:
         # reserve_amount만큼 Alpha 예산을 줄입니다
         # reserve는 "현금 보유 전략"으로, Alpha 예산 전체를 소진하지 않는 전략입니다
@@ -271,10 +289,26 @@ def suggest_portfolio(
             s for s in scores if s.ticker in enabled_tickers
         ]
 
+        # ── 거래량 캡 계산 ────────────────────────────────────────────────
+        # 과제 규칙: 주문 크기 ≤ 목요일 거래량 × 25%
+        # Core ETF는 이미 고정 금액 배분이므로 Alpha 대상 ETF에만 적용합니다.
+        # 현재가를 재조회하는 이유: 점수 계산 시 캐시된 가격이 오래됐을 수 있으며,
+        # 거래량 캡은 금액 기준이므로 현재가가 정확할수록 한도 계산이 정밀해집니다.
+        from service_market import get_volume_cap, get_current_price
+        for s in filtered_scores:
+            if s.ticker in core_positions_tickers:
+                continue  # Core 티커는 거래량 캡 불필요
+            price = get_current_price(s.ticker)
+            if price is not None and price > 0:
+                cap = get_volume_cap(s.ticker, price)
+                if cap is not None:
+                    volume_caps[s.ticker] = cap
+
         alpha_positions = allocate_alpha(
             scores=filtered_scores,
             current_positions=core_positions,
             max_alpha=effective_alpha_budget,
+            volume_caps=volume_caps,
         )
 
         # 유니버스에서 ETF 이름 조회하여 name 필드 보정
@@ -324,6 +358,10 @@ def suggest_portfolio(
         "leverage_ratio": leverage_ratio,
         "cash": cash,
         "warnings": warnings,
+        # 거래량 캡 정보: 프론트엔드에서 어떤 ETF가 유동성 제한을 받았는지 표시하는 데 사용합니다.
+        # 저장소에 저장하지 않고 응답에만 포함하는 이유: 매주 시장 유동성이 달라지므로
+        # 캡 금액은 실시간 참고용으로만 활용하고 스냅샷에는 포함하지 않습니다.
+        "volume_caps": volume_caps,
     }
 
 

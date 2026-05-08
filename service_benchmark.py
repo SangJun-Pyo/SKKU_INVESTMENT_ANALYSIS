@@ -23,7 +23,7 @@ from models import WeeklyPnL
 # KRX 상장 ETF를 사용하는 이유: 원화 기준으로 비교가 직접적이기 때문입니다.
 BENCHMARK_TICKERS = {
     "kospi200":      "069500.KS",   # KODEX 200 — 코스피200 추종
-    "sp500Hedged":   "219480.KS",   # KODEX S&P500선물(H) — 환헷지
+    "sp500Hedged":   "449180.KS",   # KODEX 미국S&P500(H) — 환헷지 (거래량 충분)
     "sp500Unhedged": "379800.KS",   # KODEX S&P500 TR — 환노출
 }
 

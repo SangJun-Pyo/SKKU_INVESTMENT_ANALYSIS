@@ -21,13 +21,14 @@ window.ETFUniverseModule = (() => {
   const CANDIDATE_ETFS = [
     /* ── Core 벤치마크 ── */
     { ticker: '069500.KS', name: 'KODEX 200',                      role: 'Core',     currency_exposure: 'KRW',      asset_class: 'Korea ETF',   label: 'KOSPI200',    reason: 'KOSPI200 벤치마크 40%를 복제하기 위한 필수 Core ETF.' },
-    { ticker: '219480.KS', name: 'KODEX 미국S&P500선물(H)',         role: 'Core',     currency_exposure: 'Hedged',   asset_class: 'Korea ETF',   label: 'S&P500(H)',   reason: 'S&P500 환헤지 벤치마크 30%를 복제하기 위한 Core ETF.' },
+    { ticker: '449180.KS', name: 'KODEX 미국S&P500(H)',              role: 'Core',     currency_exposure: 'Hedged',   asset_class: 'Korea ETF',   label: 'S&P500(H)',   reason: 'S&P500 환헤지 벤치마크 30%를 복제. 거래량 충분(674K주/일).' },
     { ticker: '379800.KS', name: 'KODEX 미국S&P500TR',              role: 'Core',     currency_exposure: 'Unhedged', asset_class: 'Korea ETF',   label: 'S&P500(U)',   reason: 'S&P500 환노출 벤치마크 30%를 복제하기 위한 Core ETF.' },
 
     /* ── Growth / Tech Alpha ── */
     { ticker: '426030.KS', name: 'TIME 미국나스닥100액티브',         role: 'Alpha',    currency_exposure: 'Unhedged', asset_class: 'Korea ETF',   label: '나스닥액티브', reason: '나스닥100 기반 글로벌 테크 액티브 ETF. 성장주 모멘텀이 강할 때 S&P500 대비 초과수익 후보.' },
     { ticker: '456600.KS', name: 'TIME 글로벌AI인공지능액티브',      role: 'Alpha',    currency_exposure: 'Unhedged', asset_class: 'Korea ETF',   label: 'AI액티브',    reason: 'AI/반도체/데이터 인프라 테마에 집중하는 액티브 ETF. 단기 AI 모멘텀 활용 후보.' },
     { ticker: '381180.KS', name: 'TIGER 미국필라델피아반도체나스닥', role: 'Alpha',    currency_exposure: 'Unhedged', asset_class: 'Korea ETF',   label: '미국반도체',   reason: '미국 반도체 사이클 노출. AI 인프라 수요가 강할 때 알파 후보.' },
+    { ticker: '390390.KS', name: 'KODEX 미국반도체MV',               role: 'Alpha',    currency_exposure: 'Unhedged', asset_class: 'Korea ETF',   label: '반도체MV',    reason: '반도체 종목 분산도가 넓어 381180 대비 변동성 완충. 반도체 섹터 균형 노출.' },
     { ticker: '305080.KS', name: 'TIGER 미국나스닥100',              role: 'Alpha',    currency_exposure: 'Unhedged', asset_class: 'Korea ETF',   label: '나스닥100',   reason: '미국 대형 기술주 모멘텀 노출. QQQ 대체 국내 상장 ETF.' },
 
     /* ── Korea Alpha ── */
@@ -53,11 +54,11 @@ window.ETFUniverseModule = (() => {
   const CANDIDATE_GROUPS = [
     {
       label: '📌 Core 벤치마크',
-      tickers: ['069500.KS', '219480.KS', '379800.KS'],
+      tickers: ['069500.KS', '449180.KS', '379800.KS'],
     },
     {
       label: '🚀 Growth / Tech Alpha',
-      tickers: ['426030.KS', '456600.KS', '381180.KS', '305080.KS'],
+      tickers: ['426030.KS', '456600.KS', '381180.KS', '390390.KS', '305080.KS'],
     },
     {
       label: '🇰🇷 Korea Alpha',

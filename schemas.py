@@ -100,7 +100,8 @@ class AllocationSuggestResponse(BaseModel):
     leverage_ratio: float        # 차입 비율 (0.0-0.30)
     cash_remaining: float        # 미배분 현금 (원)
     week: int
-    warnings: list[str] = []     # 변동성 초과 등 주의 사항
+    warnings: list[str] = []          # 익스포저 초과 등 리스크 가드레일 경고
+    volume_warnings: list[str] = []   # 거래량 캡으로 배분 금액이 조정된 ETF 목록
 
 
 # ── Risk Check (리스크 점검) ─────────────────────────────────────────────

@@ -47,7 +47,7 @@ from models import (
 from repository_papertrade import repo
 
 # 서비스 import
-from service_market import get_ohlcv, get_current_price, VALID_TICKERS
+from service_market import get_ohlcv, get_current_price, get_thursday_volume, VALID_TICKERS
 from service_portfolio import suggest_portfolio, build_portfolio_snapshot
 from service_risk_budget import check_violations
 from service_weekly_score import score_all
@@ -282,6 +282,24 @@ async def suggest_allocation(request: AllocationSuggestRequest):
         reserve_amount=request.reserve_amount,
     )
 
+    # 거래량 캡으로 조정된 ETF에 대한 경고 메시지 생성
+    # 프론트엔드에서 어떤 ETF가 유동성 제한을 받았는지 사용자에게 명시적으로 알립니다.
+    volume_caps: dict[str, float] = suggestion.get("volume_caps", {})
+    volume_warnings: list[str] = []
+    for pos in suggestion["positions"]:
+        if pos.ticker in volume_caps:
+            cap = volume_caps[pos.ticker]
+            # 배분 금액이 캡의 99% 이상이면 캡에 의해 실질적으로 제한된 것으로 판단합니다.
+            # 99% 기준을 사용하는 이유: 부동소수점 반올림으로 인한 미세 차이를 허용하기 위해서입니다.
+            if cap is not None and pos.target_amount >= cap * 0.99:
+                vol = get_thursday_volume(pos.ticker)
+                max_shares = int(vol * 0.25) if vol else 0
+                volume_warnings.append(
+                    f"{pos.ticker}: 거래량 캡 적용 "
+                    f"({pos.target_amount/1e8:.1f}억 → 최대 {cap/1e8:.2f}억, "
+                    f"목요거래량 {vol:,}주 × 25%={max_shares:,}주)"
+                )
+
     return AllocationSuggestResponse(
         positions=suggestion["positions"],
         total_exposure=suggestion["total_exposure"],
@@ -289,6 +307,7 @@ async def suggest_allocation(request: AllocationSuggestRequest):
         cash_remaining=suggestion.get("cash", 0.0),
         week=request.week,
         warnings=suggestion.get("warnings", []),
+        volume_warnings=volume_warnings,
     )
 
 

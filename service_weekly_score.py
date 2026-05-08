@@ -423,74 +423,75 @@ def _calc_drawdown_score(closes: list[float]) -> tuple[float, str]:
 
 
 def _calc_correlation_score(
+    ticker: str,
     ticker_closes: list[float],
-    portfolio: list[PortfolioPosition],
     all_ohlcv: dict,
 ) -> tuple[float, str]:
     """
     상관관계 점수 계산 (0-10점)
 
-    기존 포트폴리오와의 상관관계가 낮을수록 분산 효과가 커집니다.
-    분산 투자(낮은 상관관계)를 장려하기 위해 상관관계가 낮을수록 높은 점수를 줍니다.
+    [변경] 기존 포트폴리오 기준 → 유니버스 내 다른 ETF들과의 평균 상관관계 기준
+    이유: 확정된 포트폴리오가 주가지수 ETF들이면 모든 신규 ETF가 0.70 이상 상관관계를
+    가져 전부 1점으로 수렴하는 문제가 있었음.
+    유니버스 내 상대 비교를 사용하면 채권·금 등 헤지 ETF와 주식 ETF 간
+    자연스러운 점수 차이가 발생함.
 
-    포트폴리오가 비어 있으면 10점: 첫 번째 ETF는 비교 대상이 없으므로 최고점 부여
-    여러 포트폴리오 자산과의 평균 상관관계를 사용합니다.
+    비교 대상이 없으면 7점(중립) 부여.
     """
     reasons = []
-
-    # 포트폴리오가 없거나 비어있으면 분산 효과 검토 불가 → 최고 점수
-    if not portfolio or not all_ohlcv:
-        return 10.0, "기존 포트폴리오 없음 - 분산 효과 기준 없음(10점)"
 
     ticker_arr = np.array(ticker_closes, dtype=float)
     if len(ticker_arr) < 10:
         return 5.0, "데이터 부족 - 중립 점수"
 
+    # 유니버스 내 다른 ETF들과의 상관관계 계산
+    if not all_ohlcv or len(all_ohlcv) <= 1:
+        return 7.0, "비교 대상 ETF 없음 - 기본 점수"
+
     correlations = []
-
-    for pos in portfolio:
-        pos_ticker = pos.ticker
-        if pos_ticker not in all_ohlcv:
+    for other_ticker, other_data in all_ohlcv.items():
+        # 자기 자신은 제외
+        if other_ticker == ticker or not other_data:
             continue
 
-        pos_data = all_ohlcv[pos_ticker]
-        if not pos_data:
-            continue
+        other_closes = [d["close"] for d in other_data]
+        other_arr = np.array(other_closes, dtype=float)
 
-        pos_closes = [d["close"] for d in pos_data]
-        pos_arr = np.array(pos_closes, dtype=float)
-
-        # 길이를 맞춰야 상관계수 계산 가능 (짧은 쪽 기준)
-        min_len = min(len(ticker_arr), len(pos_arr))
+        min_len = min(len(ticker_arr), len(other_arr))
         if min_len < 10:
             continue
 
         try:
-            corr = float(np.corrcoef(ticker_arr[-min_len:], pos_arr[-min_len:])[0, 1])
-            # NaN이면 무시 (표준편차가 0인 경우 등)
+            corr = float(np.corrcoef(ticker_arr[-min_len:], other_arr[-min_len:])[0, 1])
             if not math.isnan(corr):
                 correlations.append(abs(corr))
         except Exception:
             continue
 
     if not correlations:
-        return 5.0, "상관관계 계산 불가 - 중립 점수"
+        return 7.0, "상관관계 계산 불가 - 기본 점수"
 
     avg_corr = float(np.mean(correlations))
 
-    # 상관관계 수준별 점수 (낮을수록 분산 효과 높음)
+    # 상관관계 수준별 점수
+    # 채권·금 같은 헤지 자산은 주식과 낮은 상관관계 → 높은 점수
+    # 주식 ETF끼리는 필연적으로 높은 상관관계이므로 최솟값 5점 보장
+    # (Core ETF가 상관관계로 인해 지나치게 낮은 점수를 받지 않도록)
     if avg_corr < 0.30:
         score = 10.0
         reasons.append(f"낮은 상관관계({avg_corr:.2f}) - 우수한 분산 효과")
     elif avg_corr < 0.50:
+        score = 8.0
+        reasons.append(f"중간 상관관계({avg_corr:.2f}) - 양호한 분산 효과")
+    elif avg_corr < 0.65:
         score = 7.0
-        reasons.append(f"중간 상관관계({avg_corr:.2f}) - 보통 분산 효과")
-    elif avg_corr < 0.70:
-        score = 4.0
+        reasons.append(f"보통 상관관계({avg_corr:.2f}) - 적당한 분산 효과")
+    elif avg_corr < 0.80:
+        score = 6.0
         reasons.append(f"높은 상관관계({avg_corr:.2f}) - 분산 효과 제한")
     else:
-        score = 1.0
-        reasons.append(f"매우 높은 상관관계({avg_corr:.2f}) - 분산 효과 없음")
+        score = 5.0
+        reasons.append(f"매우 높은 상관관계({avg_corr:.2f}) - 주식 ETF 특성상 기본점수")
 
     return round(score, 2), " | ".join(reasons)
 
@@ -600,7 +601,7 @@ def score_etf(
         mom_s,     mom_reason     = _calc_momentum_score(closes)
         dd_s,      dd_reason      = _calc_drawdown_score(closes)
         corr_s,    corr_reason    = _calc_correlation_score(
-            closes, portfolio or [], all_ohlcv or {}
+            ticker, closes, all_ohlcv or {}
         )
 
         # 합산 점수 (각 항목 만점의 합 = 100점)

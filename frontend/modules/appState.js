@@ -51,7 +51,7 @@ window.AppState = (() => {
     /* 벤치마크 ETF 티커 (yfinance 형식) */
     benchmarkTickers: {
       kospi200:      '069500.KS',   // KODEX 200
-      sp500Hedged:   '219480.KS',   // KODEX S&P500(H)
+      sp500Hedged:   '449180.KS',   // KODEX 미국S&P500(H) — 환헷지 (거래량 충분)
       sp500Unhedged: '379800.KS',   // KODEX S&P500(U)
     },
 

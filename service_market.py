@@ -34,13 +34,15 @@ import config
 _KR_ETF = {
     # ── Core 벤치마크 ──────────────────────────────────────────────────
     "069500.KS",  # KODEX 200 — 코스피200 추종, Core 40%
-    "219480.KS",  # KODEX 미국S&P500선물(H) — 환헷지, Core 30%
+    "219480.KS",  # KODEX 미국S&P500선물(H) — 구버전 (거래량 부족)
+    "449180.KS",  # KODEX 미국S&P500(H) — 환헷지 Core 30% (거래량 충분)
     "379800.KS",  # KODEX 미국S&P500TR — 비헷지, Core 30%
 
     # ── Growth / Tech Alpha ────────────────────────────────────────────
     "426030.KS",  # TIME 미국나스닥100액티브 — 나스닥100 기반 액티브
     "456600.KS",  # TIME 글로벌AI인공지능액티브 — AI/반도체/데이터 인프라 테마
     "381180.KS",  # TIGER 미국필라델피아반도체나스닥 — 미국 반도체 사이클
+    "390390.KS",  # KODEX 미국반도체MV — 반도체 종목 분산형 노출
     "305080.KS",  # TIGER 미국나스닥100 — QQQ 대체 국내 상장 ETF
 
     # ── Korea Alpha ────────────────────────────────────────────────────
@@ -320,3 +322,68 @@ def get_daily_prices(
             break
 
     return get_ohlcv(ticker, period=period, interval="1d")
+
+
+def get_thursday_volume(ticker: str) -> Optional[int]:
+    """
+    가장 최근 목요일 거래량 반환 (과제 규칙: 주문 ≤ 목요일 거래량 × 25%)
+
+    목요일(weekday=3)을 최우선으로 찾고,
+    없으면 가장 최근 거래일 거래량을 반환합니다.
+
+    목요일을 기준으로 삼는 이유:
+    금요일 종가로 체결하는 과제 규칙 특성상,
+    목요일 장중 거래량이 실제 유동성을 가장 잘 반영합니다.
+    캐시를 활용하여 동일 세션 내 중복 API 호출을 방지합니다.
+    """
+    cache_key = f"{ticker}_thursday_vol"
+    cached = _cache_get(cache_key)
+    if cached is not None:
+        return cached
+
+    try:
+        ticker_obj = yf.Ticker(ticker)
+        # 최근 10 거래일 조회 — 목요일을 1개 이상 포함하기에 충분한 기간입니다.
+        hist = ticker_obj.history(period="10d", interval="1d", auto_adjust=True)
+        if hist.empty:
+            return None
+
+        # 목요일(weekday=3) 최근 것부터 역순 탐색
+        # reversed()로 최신 날짜부터 확인하는 이유: 가장 최근 목요일 거래량을 우선합니다.
+        for idx in reversed(hist.index):
+            # pandas Timestamp → weekday (0=월 ... 3=목 ... 6=일)
+            wd = idx.weekday() if hasattr(idx, 'weekday') else idx.to_pydatetime().weekday()
+            if wd == 3:
+                vol = int(hist.loc[idx, 'Volume'])
+                _cache_set(cache_key, vol)
+                return vol
+
+        # 목요일이 없으면 마지막 거래일 사용 (공휴일 등 예외 처리)
+        # 완전한 거래량 데이터가 없을 때 캡 계산에 최소한의 기준을 제공합니다.
+        vol = int(hist['Volume'].iloc[-1])
+        _cache_set(cache_key, vol)
+        return vol
+
+    except Exception as e:
+        print(f"[service_market] {ticker} 목요일 거래량 조회 오류: {e}")
+        return None
+
+
+def get_volume_cap(ticker: str, current_price: float) -> Optional[float]:
+    """
+    거래량 캡 금액 계산 (목요일 거래량 × 25% × 현재가)
+
+    과제 규칙: 단일 주문 크기는 목요일 거래량의 25% 이내여야 합니다.
+    이 한도를 초과하면 시장 충격(market impact)이 발생하여
+    실제 체결가가 목표가보다 불리해질 수 있습니다.
+
+    반환값: KRW 기준 최대 주문 가능 금액 (None이면 제한 없음)
+    """
+    vol = get_thursday_volume(ticker)
+    if vol is None or current_price <= 0:
+        # 거래량 조회 실패 시 제한 없음으로 처리
+        # 캡을 0으로 설정하면 전체 배분이 막히므로 None으로 구분합니다.
+        return None
+    # 목요일 거래량의 25%만큼 주문 가능 — 나머지 75%는 다른 시장 참여자를 위해 남겨둡니다.
+    max_shares = vol * 0.25
+    return max_shares * current_price
